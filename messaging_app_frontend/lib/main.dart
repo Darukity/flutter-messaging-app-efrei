@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:messaging_app_frontend/routes.dart';
+import 'routes.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -9,8 +11,19 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      initialRoute: '/login',
-      routes: routes,
+      debugShowCheckedModeBanner: false,
+      title: 'Messaging App',
+
+      // page de départ
+      initialRoute: '/',
+
+      // routes centralisées
+      routes: AppRoutes.routes,
+
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.white,
+      ),
     );
   }
 }

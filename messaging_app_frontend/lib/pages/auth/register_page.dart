@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../services/auth_storage.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -31,8 +32,12 @@ class _RegisterPageState extends State<RegisterPage> {
     );
 
     if (result["success"]) {
-      // retour à la page login
-      Navigator.pop(context);
+      // Save token and user data, then redirect to users page
+      final data = result["data"];
+      await AuthStorage.saveToken(data["token"]);
+      await AuthStorage.saveUserData(data);
+      
+      Navigator.pushReplacementNamed(context, '/users');
     } else {
       setState(() {
         error = result["error"];

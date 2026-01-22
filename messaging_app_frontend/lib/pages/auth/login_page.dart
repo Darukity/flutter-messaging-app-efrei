@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:messaging_app_frontend/services/auth_service.dart';
+import 'package:messaging_app_frontend/services/auth_storage.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -27,8 +28,12 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     if (result["success"]) {
-      // plus tard on stockera le token ici
-      Navigator.pushReplacementNamed(context, '/chat');
+      // Save token and user data
+      final data = result["data"];
+      await AuthStorage.saveToken(data["token"]);
+      await AuthStorage.saveUserData(data);
+      
+      Navigator.pushReplacementNamed(context, '/users');
     } else {
       setState(() {
         error = result["error"];

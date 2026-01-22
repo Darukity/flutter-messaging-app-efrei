@@ -1,7 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class AuthStorage {
   static const String _tokenKey = "jwt_token";
+  static const String _userDataKey = 'user_data';
 
   // Sauvegarder le token
   static Future<void> saveToken(String token) async {
@@ -19,5 +21,22 @@ class AuthStorage {
   static Future<void> clearToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
+    await prefs.remove(_userDataKey);
+  }
+
+  // Save user data
+  static Future<void> saveUserData(Map<String, dynamic> userData) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_userDataKey, jsonEncode(userData));
+  }
+
+  // Get user data
+  static Future<Map<String, dynamic>?> getUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString(_userDataKey);
+    if (userDataString != null) {
+      return jsonDecode(userDataString);
+    }
+    return null;
   }
 }

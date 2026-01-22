@@ -19,6 +19,7 @@ class MyApp extends StatelessWidget {
 
       // routes centralisées
       routes: AppRoutes.routes,
+      onGenerateRoute: AppRoutes.onGenerateRoute,
 
       theme: ThemeData(
         primarySwatch: Colors.blue,

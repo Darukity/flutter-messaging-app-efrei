@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messaging_app_frontend/chat_page.dart';
+import 'package:messaging_app_frontend/pages/chat/chat_page.dart';
 import 'package:messaging_app_frontend/pages/auth/splash_page.dart';
 
 // pages

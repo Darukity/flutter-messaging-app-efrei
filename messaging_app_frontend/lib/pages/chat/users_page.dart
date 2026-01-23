@@ -69,8 +69,16 @@ class _UsersPageState extends State<UsersPage> {
       _selectedIndex = index;
     });
 
-    if (index == 1) {
-      Navigator.pushReplacementNamed(context, '/conversations');
+    switch (index) {
+      case 0:
+        // Rester sur users
+        break;
+      case 1:
+        Navigator.pushReplacementNamed(context, '/conversations');
+        break;
+      case 2:
+        Navigator.pushReplacementNamed(context, '/profile');
+        break;
     }
   }
 
@@ -209,6 +217,10 @@ class _UsersPageState extends State<UsersPage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.chat),
             label: 'Conversations',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
           ),
         ],
       ),

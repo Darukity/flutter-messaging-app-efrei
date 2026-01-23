@@ -3,6 +3,8 @@ import 'package:messaging_app_frontend/pages/chat/conversations_page.dart';
 import 'package:messaging_app_frontend/pages/chat/users_page.dart';
 import 'package:messaging_app_frontend/pages/chat/chat_detail_page.dart';
 import 'package:messaging_app_frontend/pages/auth/splash_page.dart';
+import 'package:messaging_app_frontend/pages/profile/profile_page.dart';
+import 'package:messaging_app_frontend/pages/profile/profile_edit_page.dart';
 
 // pages
 import 'pages/auth/login_page.dart';
@@ -15,6 +17,7 @@ class AppRoutes {
     '/register': (context) => const RegisterPage(),
     '/users': (context) => const UsersPage(),
     '/conversations': (context) => const ConversationsPage(),
+    '/profile': (context) => const ProfilePage(),
   };
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -22,6 +25,12 @@ class AppRoutes {
       final user = settings.arguments as Map<String, dynamic>;
       return MaterialPageRoute(
         builder: (context) => ChatDetailPage(otherUser: user),
+      );
+    }
+    if (settings.name == '/profile-edit') {
+      final user = settings.arguments as Map<String, dynamic>;
+      return MaterialPageRoute(
+        builder: (context) => ProfileEditPage(user: user),
       );
     }
     return null;

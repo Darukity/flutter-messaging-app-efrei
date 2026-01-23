@@ -91,16 +91,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
     }
   }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    if (index == 0) {
-      Navigator.pushReplacementNamed(context, '/users');
-    }
-  }
-
   Future<void> _logout() async {
     await AuthStorage.clearToken();
     if (mounted) {
@@ -323,9 +313,31 @@ class _ConversationsPageState extends State<ConversationsPage> {
             icon: Icon(Icons.chat),
             label: 'Conversations',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
+          ),
         ],
       ),
     );
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    switch (index) {
+      case 0:
+        Navigator.pushReplacementNamed(context, '/users');
+        break;
+      case 1:
+        // Rester sur conversations
+        break;
+      case 2:
+        Navigator.pushReplacementNamed(context, '/profile');
+        break;
+    }
   }
 
   String _formatTime(dynamic timestamp) {

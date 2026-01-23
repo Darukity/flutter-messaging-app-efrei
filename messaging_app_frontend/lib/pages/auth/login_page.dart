@@ -31,14 +31,24 @@ class _LoginPageState extends State<LoginPage> {
     if (result.success && result.data != null) {
       // Save token and user data
       final authResponse = result.data!;
+      
+      debugPrint('🔐 Login réussi !');
+      debugPrint('   Token: ${authResponse.token.substring(0, 20)}...');
+      debugPrint('   User data: ${authResponse.user}');
+      
       await AuthStorage.saveToken(authResponse.token);
       await AuthStorage.saveUserData(authResponse.user);
       
-      Navigator.pushReplacementNamed(context, '/users');
+      debugPrint('✅ Token et données utilisateur sauvegardés');
+      
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/users');
+      }
     } else {
       setState(() {
         error = result.error ?? 'Erreur de connexion';
       });
+      debugPrint('❌ Erreur login: $error');
     }
 
     setState(() {

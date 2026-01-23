@@ -3,7 +3,21 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../config/api_config.dart';
 import '../models/models.dart';
 
+/// 🔌 ChatProvider - Le "Cerveau" de la connexion Socket.IO
+/// 
+/// 🆚 Comparaison Angular : C'est l'équivalent d'un Service qui gère WebSocket
+/// 
+/// Responsabilités :
+/// - Gérer la connexion Socket.IO avec le backend
+/// - Maintenir la liste des utilisateurs en ligne
+/// - Écouter les événements temps réel (messages, statuts)
+/// - Notifier les widgets quand quelque chose change (notifyListeners)
+/// 
+/// 📖 Philosophie Provider :
+/// Les widgets s'abonnent avec `Consumer<ChatProvider>` et sont automatiquement
+/// re-rendered quand `notifyListeners()` est appelé
 class ChatProvider extends ChangeNotifier {
+  // Singleton pattern pour garantir une seule instance dans toute l'app
   static final ChatProvider _instance = ChatProvider._internal();
   late IO.Socket _socket;
   User? _currentUser;
@@ -19,6 +33,7 @@ class ChatProvider extends ChangeNotifier {
 
   ChatProvider._internal();
 
+  // Getters - Lecture seule pour l'extérieur
   IO.Socket get socket => _socket;
   User? get currentUser => _currentUser;
   User? get otherUser => _otherUser;
@@ -26,14 +41,17 @@ class ChatProvider extends ChangeNotifier {
   bool get isOnline => _isOnline;
   List<OnlineUser> get onlineUsers => _onlineUsers;
 
-  // Initialiser le socket une seule fois
+  /// 🚀 Initialiser le socket une seule fois
+  /// 
+  /// Cette méthode configure la connexion Socket.IO avec le backend.
+  /// Elle ne doit être appelée qu'une seule fois au démarrage.
   void initSocket() {
     if (_socketInitialized) {
-      print('⚠️ Socket déjà initialisé, état connecté: ${_socket.connected}');
+      debugPrint('⚠️ Socket déjà initialisé, état connecté: ${_socket.connected}');
       return;
     }
 
-    print('🚀 Initialisation du socket...');
+    debugPrint('🚀 Initialisation du socket...');
     _socket = IO.io(ApiConfig.socketUrl, <String, dynamic>{
       'transports': ['websocket', 'polling'],
       'autoConnect': true,
@@ -48,19 +66,22 @@ class ChatProvider extends ChangeNotifier {
     });
 
     _socketInitialized = true;
-    print('   Socket objet créé, autoConnect: true');
+    debugPrint('   Socket objet créé, autoConnect: true');
     _setupSocketListeners();
   }
 
+  /// 📡 Configurer les écouteurs Socket.IO
+  /// 
+  /// Ces listeners réagissent aux événements envoyés par le backend
   void _setupSocketListeners() {
     _socket.on('connect', (_) {
       _isConnected = true;
-      print('✅ Socket connecté avec ID: ${_socket.id}');
-      notifyListeners();
+      debugPrint('✅ Socket connecté avec ID: ${_socket.id}');
+      notifyListeners(); // 🔔 Notifier les widgets
       
       // Réémettre addUser si on a déjà un utilisateur
       if (_currentUser != null) {
-        print('   📤 Rééémission addUser pour ${_currentUser!.id}');
+        debugPrint('   📤 Rééémission addUser pour ${_currentUser!.id}');
         _socket.emit('addUser', _currentUser!.id);
       }
     });
@@ -68,17 +89,17 @@ class ChatProvider extends ChangeNotifier {
     _socket.on('disconnect', (_) {
       _isConnected = false;
       _isOnline = false;
-      print('❌ Socket déconnecté');
-      notifyListeners();
+      debugPrint('❌ Socket déconnecté');
+      notifyListeners(); // 🔔 Notifier les widgets
     });
 
     _socket.on('connect_error', (error) {
-      print('⚠️ Erreur connexion socket: $error');
+      debugPrint('⚠️ Erreur connexion socket: $error');
       _isConnected = false;
     });
 
     _socket.on('getUsers', (users) {
-      print('👥 Utilisateurs en ligne reçus: $users');
+      debugPrint('👥 Utilisateurs en ligne reçus: $users');
       
       // ✅ Convertir en models OnlineUser
       _onlineUsers = (users as List)
@@ -91,49 +112,54 @@ class ChatProvider extends ChangeNotifier {
         _isOnline = _onlineUsers.any((u) => u.userId == _otherUser!.id);
         
         if (wasOnline != _isOnline) {
-          print('${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${_otherUser!.fullName}');
-          notifyListeners();
+          debugPrint('${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${_otherUser!.fullName}');
+          notifyListeners(); // 🔔 Notifier les widgets
         } else {
-          print('   → Statut inchangé (${_isOnline ? 'EN LIGNE' : 'HORS LIGNE'})');
+          debugPrint('   → Statut inchangé (${_isOnline ? 'EN LIGNE' : 'HORS LIGNE'})');
         }
       } else {
-        print('   → Pas d\'autre utilisateur défini');
+        debugPrint('   → Pas d\'autre utilisateur défini');
       }
     });
 
     _socket.on('getMessage', (data) {
-      print('📨 Nouveau message reçu: $data');
+      debugPrint('📨 Nouveau message reçu: $data');
     });
 
     _socket.on('error', (error) {
-      print('❌ Erreur socket: $error');
+      debugPrint('❌ Erreur socket: $error');
     });
   }
 
-  // 🔗 Connecter l'utilisateur au socket
+  /// 🔗 Connecter l'utilisateur au socket
+  /// 
+  /// Cette méthode enregistre l'utilisateur actuel dans le système Socket.IO
+  /// pour qu'il soit visible comme "en ligne" par les autres utilisateurs
   void connectUser(User user) {
     _currentUser = user;
     if (!_socketInitialized) {
       initSocket();
     }
     
-    print('🔗 Connexion utilisateur: ${user.id}');
+    debugPrint('🔗 Connexion utilisateur: ${user.id}');
     
     // 🔍 Vérifier si le socket est déjà connecté
     if (_socket.connected) {
-      print('   ✅ Socket déjà connecté, émission addUser immédiate');
+      debugPrint('   ✅ Socket déjà connecté, émission addUser immédiate');
       _socket.emit('addUser', user.id);
     } else {
-      print('   ⏳ Socket pas encore connecté, attente de la connexion...');
+      debugPrint('   ⏳ Socket pas encore connecté, attente de la connexion...');
       // Attendre que le socket se connecte, puis émettre addUser
       _socket.onConnect((_) {
-        print('   ✅ Socket connecté maintenant, émission addUser');
+        debugPrint('   ✅ Socket connecté maintenant, émission addUser');
         _socket.emit('addUser', user.id);
       });
     }
   }
 
-  // 👤 Définir l'autre utilisateur de la conversation
+  /// 👤 Définir l'autre utilisateur de la conversation
+  /// 
+  /// Permet de suivre le statut en ligne de l'autre personne
   void setOtherUser(User user) {
     _otherUser = user;
     
@@ -143,30 +169,32 @@ class ChatProvider extends ChangeNotifier {
       _isOnline = _onlineUsers.any((u) => u.userId == user.id);
       
       if (wasOnline != _isOnline) {
-        print('🔄 Statut immédiat: ${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${user.fullName}');
+        debugPrint('🔄 Statut immédiat: ${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${user.fullName}');
       }
     } else {
-      print('⚠️ Liste utilisateurs vide, en attente de getUsers');
+      debugPrint('⚠️ Liste utilisateurs vide, en attente de getUsers');
       _isOnline = false;
     }
     
-    notifyListeners();
+    notifyListeners(); // 🔔 Notifier les widgets
   }
 
-  // Émettre un message
+  /// 📤 Émettre un message via Socket.IO
+  /// 
+  /// Envoie un message en temps réel à l'autre utilisateur
   void sendSocketMessage({
     required Map<String, dynamic> addedMessage,
     required Map<String, dynamic> conversation,
   }) {
     // 🔍 Vérifier si le socket est vraiment connecté
     if (!_socket.connected) {
-      print('⚠️ Socket non connecté (_socket.connected = ${_socket.connected}), tentative de reconnexion...');
+      debugPrint('⚠️ Socket non connecté (_socket.connected = ${_socket.connected}), tentative de reconnexion...');
       // Attendre un peu et réessayer
       Future.delayed(const Duration(milliseconds: 500), () {
         if (_socket.connected) {
           _sendMessageNow(addedMessage, conversation);
         } else {
-          print('❌ Socket toujours non connecté après délai');
+          debugPrint('❌ Socket toujours non connecté après délai');
         }
       });
       return;
@@ -175,12 +203,12 @@ class ChatProvider extends ChangeNotifier {
     _sendMessageNow(addedMessage, conversation);
   }
 
-  // Envoyer le message maintenant (socket connecté)
+  /// Envoyer le message maintenant (socket connecté)
   void _sendMessageNow(
     Map<String, dynamic> addedMessage,
     Map<String, dynamic> conversation,
   ) {
-    print('📤 Envoi du message via socket à: ${_otherUser!.id}');
+    debugPrint('📤 Envoi du message via socket à: ${_otherUser!.id}');
     _socket.emit('sendMessage', {
       'addedMessage': addedMessage,
       'receiver': _otherUser,
@@ -188,14 +216,16 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  // Écouter les messages reçus (une seule fois)
+  /// 📩 Écouter les messages reçus (une seule fois)
+  /// 
+  /// Configure un callback qui sera appelé à chaque réception de message
   void onMessageReceived(Function(Map<String, dynamic>) callback) {
     // Supprimer les anciens listeners pour éviter les doublons
     _socket.off('getMessage');
     
     // Ajouter le nouveau listener
     _socket.on('getMessage', (data) {
-      print('📩 Callback message reçu: $data');
+      debugPrint('📩 Callback message reçu: $data');
       callback(data);
     });
   }

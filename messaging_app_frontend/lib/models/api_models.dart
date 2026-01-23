@@ -1,4 +1,7 @@
 /// 📱 Model pour les réponses d'authentification
+/// 
+/// Le backend retourne les données utilisateur et le token dans une structure plate :
+/// { "_id": "123", "firstName": "John", "token": "xyz", ... }
 class AuthResponse {
   final String token;
   final Map<String, dynamic> user;
@@ -9,9 +12,18 @@ class AuthResponse {
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
+    // Le backend retourne une structure plate avec le token et les données user mélangées
+    // On extrait le token et on garde le reste comme données utilisateur
+    final token = json['token'] ?? '';
+    
+    // Créer une copie des données sans le token pour les données utilisateur
+    final userData = Map<String, dynamic>.from(json);
+    userData.remove('token');  // Enlever le token des données user
+    userData.remove('password');  // S'assurer que le mot de passe n'est pas inclus
+    
     return AuthResponse(
-      token: json['token'] ?? '',
-      user: json['user'] ?? {},
+      token: token,
+      user: userData,
     );
   }
 

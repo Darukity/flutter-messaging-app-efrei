@@ -39,10 +39,16 @@ class _UsersPageState extends State<UsersPage> {
 
   Future<void> _loadCurrentUser() async {
     final userData = await AuthStorage.getUserData();
+    debugPrint('👤 [UsersPage] Chargement utilisateur actuel...');
+    debugPrint('   Données: $userData');
+    
     if (userData != null) {
       setState(() {
         _currentUser = User.fromJson(userData);
       });
+      debugPrint('   ✅ Utilisateur chargé: ${_currentUser!.firstName} ${_currentUser!.lastName}');
+    } else {
+      debugPrint('   ❌ Aucune donnée utilisateur trouvée en stockage');
     }
   }
 

@@ -20,6 +20,14 @@ class Conversation {
 
   /// Créer une Conversation depuis une Map (réponse API)
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    // 📅 Helper pour parser le timestamp (peut être String ou DateTime)
+    DateTime parseTimestamp(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is DateTime) return value;
+      if (value is String) return DateTime.parse(value);
+      return DateTime.now();
+    }
+    
     final messagesList = (json['messages'] as List?)
         ?.map((msg) => Message.fromJson(msg as Map<String, dynamic>))
         .toList() ??
@@ -30,12 +38,8 @@ class Conversation {
       user1Id: json['user1_id'] ?? '',
       user2Id: json['user2_id'] ?? '',
       messages: messagesList,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
-          : DateTime.now(),
+      createdAt: parseTimestamp(json['createdAt']),
+      updatedAt: parseTimestamp(json['updatedAt']),
     );
   }
 

@@ -31,8 +31,10 @@ class _ConversationsPageState extends State<ConversationsPage> {
 
   Future<void> _protectPage() async {
     final token = await AuthStorage.getToken();
+    debugPrint('🔐 Protection page - Token: ${token != null ? "présent" : "absent"}');
     if (token == null) {
       if (mounted) {
+        debugPrint('❌ Pas de token, redirection vers login');
         Navigator.pushReplacementNamed(context, '/login');
       }
     }
@@ -40,21 +42,32 @@ class _ConversationsPageState extends State<ConversationsPage> {
 
   Future<void> _loadCurrentUser() async {
     final userData = await AuthStorage.getUserData();
+    debugPrint('👤 Chargement utilisateur actuel...');
+    debugPrint('   Données: $userData');
+    
     if (userData != null) {
       setState(() {
         _currentUser = User.fromJson(userData);
       });
+      debugPrint('   ✅ Utilisateur chargé: ${_currentUser!.firstName} ${_currentUser!.lastName}');
+    } else {
+      debugPrint('   ❌ Aucune donnée utilisateur trouvée en stockage');
     }
   }
 
   Future<void> _loadConversations() async {
     try {
+      debugPrint('🔍 Chargement des conversations...');
       final conversations = await ConversationService.getConversations();
+      debugPrint('   ✅ ${conversations.length} conversations récupérées');
+      
       // Filter conversations where current user is involved
       final myConversations = conversations.where((conv) {
         return conv.user1Id == _currentUser?.id || 
                conv.user2Id == _currentUser?.id;
       }).toList();
+      
+      debugPrint('   → ${myConversations.length} conversations pour l\'utilisateur actuel');
       
       // 🔄 Rafraîchir les détails de l'utilisateur pour chaque conversation
       // Cela assure que les noms modifiés sont affichés correctement
@@ -66,8 +79,9 @@ class _ConversationsPageState extends State<ConversationsPage> {
         try {
           final userDetails = await ConversationService.getUserById(otherUserId);
           _userCache[otherUserId] = userDetails;
+          debugPrint('   ✅ Cache mis à jour pour: ${userDetails.fullName}');
         } catch (e) {
-          print('❌ Erreur lors du chargement des détails pour $otherUserId: $e');
+          debugPrint('❌ Erreur lors du chargement des détails pour $otherUserId: $e');
           // Le cache reste avec les anciennes données en cas d'erreur
         }
       }
@@ -77,6 +91,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('❌ Erreur chargement conversations: $e');
       setState(() {
         _isLoading = false;
       });
@@ -195,7 +210,9 @@ class _ConversationsPageState extends State<ConversationsPage> {
                         CircleAvatar(
                           backgroundColor: Colors.blue,
                           child: Text(
-                            _currentUser!.firstName[0].toUpperCase(),
+                            _currentUser!.firstName.isNotEmpty
+                                ? _currentUser!.firstName[0].toUpperCase()
+                                : '?',
                             style: const TextStyle(color: Colors.white),
                           ),
                         ),
@@ -271,7 +288,9 @@ class _ConversationsPageState extends State<ConversationsPage> {
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue.shade300,
                                   child: Text(
-                                    otherUser.firstName[0].toUpperCase(),
+                                    otherUser.firstName.isNotEmpty
+                                        ? otherUser.firstName[0].toUpperCase()
+                                        : '?',
                                     style: const TextStyle(color: Colors.white),
                                   ),
                                 ),

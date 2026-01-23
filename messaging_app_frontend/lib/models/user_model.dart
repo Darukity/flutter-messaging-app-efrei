@@ -28,6 +28,18 @@ class User {
 
   /// Créer un User depuis une Map (réponse API)
   factory User.fromJson(Map<String, dynamic> json) {
+    // 🖼️ Helper pour extraire l'URL depuis un objet image
+    // Backend retourne: {public_id: '', url: ''} ou juste une string
+    String? extractImageUrl(dynamic imageData) {
+      if (imageData == null) return null;
+      if (imageData is String) return imageData;
+      if (imageData is Map) {
+        final url = imageData['url'];
+        return url != null && url.toString().isNotEmpty ? url.toString() : null;
+      }
+      return null;
+    }
+    
     return User(
       id: json['_id'] ?? '',
       firstName: json['firstName'] ?? '',
@@ -38,8 +50,8 @@ class User {
       location: json['location'],
       aboutUser: json['aboutUser'],
       skills: json['skills'] != null ? List<String>.from(json['skills']) : null,
-      profileImg: json['profileImg'],
-      coverImg: json['coverImg'],
+      profileImg: extractImageUrl(json['profileImg']),
+      coverImg: extractImageUrl(json['coverImg']),
     );
   }
 

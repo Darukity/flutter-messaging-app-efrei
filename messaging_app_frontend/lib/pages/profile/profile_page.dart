@@ -36,18 +36,26 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       // Charger les données locales d'abord (rapide)
       final userData = await AuthStorage.getUserData();
+      debugPrint('👤 [ProfilePage] Chargement profil...');
+      debugPrint('   Données: $userData');
+      
       if (userData != null) {
         setState(() {
           _currentUser = User.fromJson(userData);
+          _isLoading = false;
+        });
+        debugPrint('   ✅ Profil chargé: ${_currentUser!.firstName} ${_currentUser!.lastName}');
+      } else {
+        debugPrint('   ❌ Aucune donnée utilisateur trouvée en stockage');
+        setState(() {
           _isLoading = false;
         });
       }
 
       // Puis faire un refresh depuis le backend pour avoir les dernières données
       // Note: Vous pouvez utiliser UserProfileService.getCurrentProfile() si vous avez un endpoint backend
-      print('✅ Profil chargé avec les données locales');
     } catch (e) {
-      print('❌ Erreur chargement profil: $e');
+      debugPrint('❌ Erreur chargement profil: $e');
       setState(() {
         _isLoading = false;
       });
@@ -138,7 +146,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                   radius: 58,
                                   backgroundColor: Colors.blue.shade300,
                                   child: Text(
-                                    '${_currentUser!.firstName[0]}${_currentUser!.lastName[0]}'.toUpperCase(),
+                                    '${_currentUser!.firstName.isNotEmpty ? _currentUser!.firstName[0] : '?'}${_currentUser!.lastName.isNotEmpty ? _currentUser!.lastName[0] : '?'}'
+                                        .toUpperCase(),
                                     style: const TextStyle(
                                       fontSize: 32,
                                       fontWeight: FontWeight.bold,

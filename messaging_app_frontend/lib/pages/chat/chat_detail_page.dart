@@ -55,20 +55,19 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       try {
         final conversation = await ConversationService.getConversation(widget.otherUser.id);
         if (conversation != null && conversation.messages.isNotEmpty) {
-          // Convertir les messages du modèle Conversation en Message provider
-          final providerMessages = conversation.messages.map((m) {
-            // Convertir models.Message vers Map compatible
-            final messageMap = {
+          // Convertir les messages du modèle Conversation vers des Maps
+          // setMessages() attend List<dynamic> (raw maps), pas des objets ProviderMessage
+          final messageMaps = conversation.messages.map((m) {
+            return {
               '_id': m.id,
               'author_id': m.authorId,
               'author': m.author,
               'content': m.content,
               'authorImage': m.authorImage,
-              'timestamp': m.timestamp,
+              'timestamp': m.timestamp.toIso8601String(), // ✅ Convertir DateTime en String
             };
-            return ProviderMessage.fromJson(messageMap);
           }).toList();
-          messageProvider.setMessages(providerMessages);
+          messageProvider.setMessages(messageMaps); // ✅ Passer les maps, pas les objets
         }
         messageProvider.stopLoading();
         // 📌 Scroller vers le bas après le chargement
@@ -154,7 +153,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           'author': lastModelMessage.author,
           'content': lastModelMessage.content,
           'authorImage': lastModelMessage.authorImage,
-          'timestamp': lastModelMessage.timestamp,
+          'timestamp': lastModelMessage.timestamp.toIso8601String(), // ✅ Convertir DateTime en String
         };
         final lastMessage = ProviderMessage.fromJson(lastMessageMap);
         context.read<MessageProvider>().addMessage(lastMessage);
@@ -209,7 +208,9 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               backgroundColor: Colors.blue.shade300,
               radius: 18,
               child: Text(
-                widget.otherUser.firstName[0].toUpperCase(),
+                widget.otherUser.firstName.isNotEmpty
+                    ? widget.otherUser.firstName[0].toUpperCase()
+                    : '?',
                 style: const TextStyle(color: Colors.white),
               ),
             ),

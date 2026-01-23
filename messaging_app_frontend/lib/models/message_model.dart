@@ -18,15 +18,21 @@ class Message {
 
   /// Créer un Message depuis une Map (réponse API)
   factory Message.fromJson(Map<String, dynamic> json) {
+    // 📅 Helper pour parser le timestamp (peut être String ou DateTime)
+    DateTime parseTimestamp(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is DateTime) return value;
+      if (value is String) return DateTime.parse(value);
+      return DateTime.now();
+    }
+    
     return Message(
       id: json['_id'] ?? '',
       authorId: json['author_id'] ?? '',
       author: json['author'] ?? 'Utilisateur inconnu',
       content: json['content'] ?? '',
       authorImage: json['authorImage'],
-      timestamp: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+      timestamp: parseTimestamp(json['createdAt'] ?? json['timestamp']),
     );
   }
 

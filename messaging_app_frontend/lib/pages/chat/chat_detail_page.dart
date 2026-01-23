@@ -19,6 +19,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Map<String, dynamic>? _currentUser;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late double _previousBottomInset = 0;
 
   @override
   void initState() {
@@ -55,6 +56,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           messageProvider.setMessages(conversation['messages']);
         }
         messageProvider.stopLoading();
+        // 📌 Scroller vers le bas après le chargement
+        _scrollToBottom();
       } catch (e) {
         print('Erreur chargement messages: $e');
         messageProvider.setError(e.toString());
@@ -161,6 +164,17 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 📱 Détecter l'ouverture du clavier
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    
+    // Si le clavier s'ouvre, scroller vers le bas
+    if (bottomInset > _previousBottomInset) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    }
+    _previousBottomInset = bottomInset;
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -317,46 +331,59 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             ),
           ),
 
-          // Message input
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.shade300,
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
-                ),
-              ],
+          // Message input avec gestion du clavier
+          Padding(
+            padding: EdgeInsets.only(
+              left: 0,
+              right: 0,
+              top: 16,
+              bottom: 0 ,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Écrivez un message...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
+            child: Container(
+              padding: EdgeInsets.only(
+              left: 5,
+              right: 5,
+              top: 10,
+              bottom: 10 ,
+            ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.shade300,
+                    blurRadius: 4,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Écrivez un message...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
+                      onSubmitted: (_) => _sendMessage(),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
                   ),
-                ),
-                const SizedBox(width: 8),
-                CircleAvatar(
-                  backgroundColor: Colors.blue,
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white),
-                    onPressed: _sendMessage,
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: IconButton(
+                      icon: const Icon(Icons.send, color: Colors.white),
+                      onPressed: _sendMessage,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -368,14 +395,22 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
 
-    if (difference.inMinutes < 1) {
-      return 'À l\'instant';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h';
-    } else {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    // ⏱️ Messages de moins d'1 jour: afficher temps relatif
+    if (difference.inDays == 0) {
+      if (difference.inMinutes < 1) {
+        return 'À l\'instant';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m';
+      } else {
+        return '${difference.inHours}h';
+      }
     }
+    
+    // 📅 Messages d'après 1 jour: afficher la date + heure exacte
+    final day = timestamp.day.toString().padLeft(2, '0');
+    final month = timestamp.month.toString().padLeft(2, '0');
+    final hour = timestamp.hour.toString().padLeft(2, '0');
+    final minute = timestamp.minute.toString().padLeft(2, '0');
+    return '$day/$month/${timestamp.year} $hour:$minute';
   }
 }

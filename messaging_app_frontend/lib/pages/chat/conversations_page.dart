@@ -54,27 +54,23 @@ class _ConversationsPageState extends State<ConversationsPage> {
         return conv['user1_id'] == _currentUser?['_id'] || 
                conv['user2_id'] == _currentUser?['_id'];
       }).toList();
-// Fetch user details for conversations that need them
+      
+      // 🔄 Rafraîchir les détails de l'utilisateur pour chaque conversation
+      // Cela assure que les noms modifiés sont affichés correctement
       for (var conv in myConversations) {
         final otherUserId = conv['user1_id'] == _currentUser?['_id']
             ? conv['user2_id']
             : conv['user1_id'];
         
-        // Check if we need to fetch user details (no messages from other user yet)
-        final messages = conv['messages'] as List;
-        final hasOtherUserMessage = messages.any((msg) => msg['author_id'] == otherUserId);
-        
-        if (!hasOtherUserMessage && !_userCache.containsKey(otherUserId)) {
-          try {
-            final userDetails = await ConversationService.getUserById(otherUserId);
-            _userCache[otherUserId] = userDetails;
-          } catch (e) {
-            print('Failed to fetch user details for $otherUserId: $e');
-          }
+        try {
+          final userDetails = await ConversationService.getUserById(otherUserId);
+          _userCache[otherUserId] = userDetails;
+        } catch (e) {
+          print('❌ Erreur lors du chargement des détails pour $otherUserId: $e');
+          // Le cache reste avec les anciennes données en cas d'erreur
         }
       }
 
-      
       setState(() {
         _conversations = myConversations;
         _isLoading = false;
@@ -103,15 +99,18 @@ class _ConversationsPageState extends State<ConversationsPage> {
         ? conversation['user2_id']
         : conversation['user1_id'];
 
-    // Check if we have cached user details
+    // ✅ Priorité 1: Vérifier le cache (qui est rafraîchi à chaque chargement)
     if (_userCache.containsKey(otherUserId)) {
-      return _userCache[otherUserId]!;
+      final cachedUser = _userCache[otherUserId]!;
+      // S'assurer que nous avons les bonnes données
+      if (cachedUser['firstName'] != null && cachedUser['firstName'].isNotEmpty) {
+        return cachedUser;
+      }
     }
 
-    // Get the last message to extract user info
+    // ✅ Priorité 2: Extraire du dernier message (fallback)
     final messages = conversation['messages'] as List;
     if (messages.isNotEmpty) {
-      // Try to find a message from the other user (not from current user)
       try {
         final otherUserMessage = messages.firstWhere(
           (msg) => msg['author_id'] == otherUserId,
@@ -124,16 +123,11 @@ class _ConversationsPageState extends State<ConversationsPage> {
           'email': '',
         };
       } catch (e) {
-        // No messages from other user yet, return basic info with ID
-        return {
-          '_id': otherUserId,
-          'firstName': 'Utilisateur',
-          'lastName': '',
-          'email': '',
-        };
+        // Aucun message de cet utilisateur
       }
     }
 
+    // ✅ Priorité 3: Données par défaut
     return {
       '_id': otherUserId,
       'firstName': 'Utilisateur',

@@ -10,7 +10,7 @@ import 'pages/auth/register_page.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> routes = {
-    '/': (context) => const SplashPage(),
+    '/': (context) => const LoginPage(),
     '/login': (context) => const LoginPage(),
     '/register': (context) => const RegisterPage(),
     '/users': (context) => const UsersPage(),

@@ -1,5 +1,5 @@
 class ApiConfig {
-  static const String baseUrl = "http://localhost:4000";
+  static const String baseUrl = "https://flutter-messaging-app-efrei.onrender.com";
 
   // Endpoints backend
   static const String register = "/users/signup";

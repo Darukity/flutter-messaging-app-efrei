@@ -1,16 +1,20 @@
 import '../config/api_config.dart';
 import 'dio_client.dart';
+import '../models/models.dart';
 
 class ConversationService {
   static final DioClient _dioClient = DioClient();
 
-  static Future<List<Map<String, dynamic>>> getConversations() async {
+  /// 📋 Obtenir toutes les conversations avec typage fort
+  static Future<List<Conversation>> getConversations() async {
     try {
       final response = await _dioClient.get('${ApiConfig.baseUrl}/conversations');
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        return List<Map<String, dynamic>>.from(data);
+        final data = response.data as List;
+        return data
+            .map((item) => Conversation.fromJson(item as Map<String, dynamic>))
+            .toList();
       } else {
         throw Exception('Impossible de récupérer les conversations');
       }
@@ -19,14 +23,16 @@ class ConversationService {
     }
   }
 
-  // Get all users (temporary until user list feature is implemented)
-  static Future<List<Map<String, dynamic>>> getAllUsers() async {
+  /// 👥 Obtenir tous les utilisateurs avec typage fort
+  static Future<List<User>> getAllUsers() async {
     try {
       final response = await _dioClient.get('${ApiConfig.baseUrl}/users');
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        return List<Map<String, dynamic>>.from(data);
+        final data = response.data as List;
+        return data
+            .map((item) => User.fromJson(item as Map<String, dynamic>))
+            .toList();
       } else {
         throw Exception('Impossible de récupérer les utilisateurs');
       }
@@ -35,14 +41,13 @@ class ConversationService {
     }
   }
 
-  // Get conversation with a specific user
-  static Future<Map<String, dynamic>?> getConversation(String userId) async {
+  /// 💬 Obtenir une conversation spécifique avec typage fort
+  static Future<Conversation?> getConversation(String userId) async {
     try {
       final response = await _dioClient.get('${ApiConfig.baseUrl}/conversations/$userId');
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        return data;
+        return Conversation.fromJson(response.data as Map<String, dynamic>);
       } else {
         return null; // No conversation exists yet
       }
@@ -51,8 +56,8 @@ class ConversationService {
     }
   }
 
-  // Send a message to a user
-  static Future<Map<String, dynamic>> sendMessage({
+  /// 📤 Envoyer un message avec model typé
+  static Future<Conversation> sendMessage({
     required String user2Id,
     required String author,
     required String content,
@@ -70,8 +75,7 @@ class ConversationService {
       );
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        return data;
+        return Conversation.fromJson(response.data as Map<String, dynamic>);
       } else {
         throw Exception('Impossible d\'envoyer le message');
       }
@@ -80,14 +84,13 @@ class ConversationService {
     }
   }
 
-  // Get user details by ID
-  static Future<Map<String, dynamic>> getUserById(String userId) async {
+  /// 👤 Obtenir un utilisateur par ID avec typage fort
+  static Future<User> getUserById(String userId) async {
     try {
       final response = await _dioClient.get('${ApiConfig.baseUrl}/users/$userId');
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        return data;
+        return User.fromJson(response.data as Map<String, dynamic>);
       } else {
         throw Exception('Impossible de récupérer les informations de l\'utilisateur');
       }

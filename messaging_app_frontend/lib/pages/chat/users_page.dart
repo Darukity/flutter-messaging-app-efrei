@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:messaging_app_frontend/services/auth_storage.dart';
 import 'package:messaging_app_frontend/services/conversation_service.dart';
+import 'package:messaging_app_frontend/models/models.dart';
 
 class UsersPage extends StatefulWidget {
   const UsersPage({Key? key}) : super(key: key);
@@ -10,8 +11,8 @@ class UsersPage extends StatefulWidget {
 }
 
 class _UsersPageState extends State<UsersPage> {
-  List<dynamic> _users = [];
-  Map<String, dynamic>? _currentUser;
+  List<User> _users = [];
+  User? _currentUser;
   bool _isLoading = true;
   int _selectedIndex = 0;
 
@@ -40,7 +41,7 @@ class _UsersPageState extends State<UsersPage> {
     final userData = await AuthStorage.getUserData();
     if (userData != null) {
       setState(() {
-        _currentUser = userData;
+        _currentUser = User.fromJson(userData);
       });
     }
   }
@@ -49,7 +50,7 @@ class _UsersPageState extends State<UsersPage> {
     try {
       final users = await ConversationService.getAllUsers();
       setState(() {
-        _users = users.where((user) => user['_id'] != _currentUser?['_id']).toList();
+        _users = users.where((user) => user.id != _currentUser?.id).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -71,7 +72,7 @@ class _UsersPageState extends State<UsersPage> {
 
     switch (index) {
       case 0:
-        // Rester sur users
+        Navigator.pushReplacementNamed(context, '/users');
         break;
       case 1:
         Navigator.pushReplacementNamed(context, '/conversations');
@@ -89,7 +90,7 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  void _openChat(Map<String, dynamic> user) {
+  void _openChat(User user) {
     Navigator.pushNamed(
       context,
       '/chat-detail',
@@ -122,7 +123,9 @@ class _UsersPageState extends State<UsersPage> {
                         CircleAvatar(
                           backgroundColor: Colors.blue,
                           child: Text(
-                            _currentUser!['firstName'][0].toUpperCase(),
+                            _currentUser!.firstName.isNotEmpty
+                                ? _currentUser!.firstName[0].toUpperCase()
+                                : '?',
                             style: const TextStyle(color: Colors.white),
                           ),
                         ),
@@ -132,14 +135,14 @@ class _UsersPageState extends State<UsersPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${_currentUser!['firstName']} ${_currentUser!['lastName']}',
+                                '${_currentUser!.firstName} ${_currentUser!.lastName}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
                               ),
                               Text(
-                                _currentUser!['email'],
+                                _currentUser!.email,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
@@ -180,18 +183,20 @@ class _UsersPageState extends State<UsersPage> {
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue.shade300,
                                   child: Text(
-                                    user['firstName'][0].toUpperCase(),
+                                    user.firstName.isNotEmpty
+                                        ? user.firstName[0].toUpperCase()
+                                        : '?',
                                     style: const TextStyle(color: Colors.white),
                                   ),
                                 ),
                                 title: Text(
-                                  '${user['firstName']} ${user['lastName']}',
+                                  '${user.firstName} ${user.lastName}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
                                 subtitle: Text(
-                                  user['email'],
+                                  user.email,
                                   style: const TextStyle(fontSize: 12),
                                 ),
                                 trailing: const Icon(

@@ -4,10 +4,10 @@ import 'package:messaging_app_frontend/providers/message_provider.dart';
 import 'package:messaging_app_frontend/providers/chat_provider.dart';
 import 'package:messaging_app_frontend/services/auth_storage.dart';
 import 'package:messaging_app_frontend/services/conversation_service.dart';
-import 'package:messaging_app_frontend/config/api_config.dart';
+import 'package:messaging_app_frontend/models/models.dart' as models;
 
 class ChatDetailPage extends StatefulWidget {
-  final Map<String, dynamic> otherUser;
+  final models.User otherUser;
 
   const ChatDetailPage({Key? key, required this.otherUser}) : super(key: key);
 
@@ -16,7 +16,7 @@ class ChatDetailPage extends StatefulWidget {
 }
 
 class _ChatDetailPageState extends State<ChatDetailPage> {
-  Map<String, dynamic>? _currentUser;
+  models.User? _currentUser;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late double _previousBottomInset = 0;
@@ -30,19 +30,21 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Future<void> _initializePage() async {
     // Charger l'utilisateur actuel
     final userData = await AuthStorage.getUserData();
-    setState(() {
-      _currentUser = userData;
-    });
+    if (userData != null) {
+      setState(() {
+        _currentUser = models.User.fromJson(userData);
+      });
+    }
 
     // Initialiser le ChatProvider (singleton, une seule fois)
     final chatProvider = context.read<ChatProvider>();
-    if (userData != null) {
+    if (_currentUser != null) {
       // Initialiser le socket si pas déjà fait
       if (!chatProvider.isConnected) {
         chatProvider.initSocket();
       }
       // Connecter l'utilisateur
-      chatProvider.connectUser(userData);
+      chatProvider.connectUser(_currentUser!);
       chatProvider.setOtherUser(widget.otherUser);
     }
 
@@ -51,9 +53,22 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       final messageProvider = context.read<MessageProvider>();
       messageProvider.startLoading();
       try {
-        final conversation = await ConversationService.getConversation(widget.otherUser['_id']);
-        if (conversation != null && conversation['messages'] != null) {
-          messageProvider.setMessages(conversation['messages']);
+        final conversation = await ConversationService.getConversation(widget.otherUser.id);
+        if (conversation != null && conversation.messages.isNotEmpty) {
+          // Convertir les messages du modèle Conversation en Message provider
+          final providerMessages = conversation.messages.map((m) {
+            // Convertir models.Message vers Map compatible
+            final messageMap = {
+              '_id': m.id,
+              'author_id': m.authorId,
+              'author': m.author,
+              'content': m.content,
+              'authorImage': m.authorImage,
+              'timestamp': m.timestamp,
+            };
+            return ProviderMessage.fromJson(messageMap);
+          }).toList();
+          messageProvider.setMessages(providerMessages);
         }
         messageProvider.stopLoading();
         // 📌 Scroller vers le bas après le chargement
@@ -71,19 +86,25 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           print('📨 Données reçues du socket: $data');
           final addedMessage = data['addedMessage'];
           
-          if (addedMessage != null) {
+          if (addedMessage != null && addedMessage is Map) {
             final messages = addedMessage['messages'];
             if (messages != null && messages is List && messages.isNotEmpty) {
-              final lastMessage = messages.last;
-              print('📌 Dernier message: author_id=${lastMessage['author_id']}, otherUserId=${widget.otherUser['_id']}');
+              // Récupérer le dernier message et le convertir en Message provider
+              try {
+                final lastMsgData = messages.last as Map<String, dynamic>;
+                final lastMessage = ProviderMessage.fromJson(lastMsgData);
+                print('📌 Dernier message: author_id=${lastMessage.authorId}, otherUserId=${widget.otherUser.id}');
 
-              // Ajouter uniquement si c'est de l'autre utilisateur
-              if (lastMessage['author_id'] == widget.otherUser['_id']) {
-                print('✅ Ajout du message reçu de ${widget.otherUser['firstName']}');
-                context.read<MessageProvider>().addReceivedMessage(lastMessage);
-                _scrollToBottom();
-              } else {
-                print('⏭️ Ignoré: message de soi-même');
+                // Ajouter uniquement si c'est de l'autre utilisateur
+                if (lastMessage.authorId == widget.otherUser.id) {
+                  print('✅ Ajout du message reçu de ${widget.otherUser.firstName}');
+                  context.read<MessageProvider>().addReceivedMessage(lastMessage);
+                  _scrollToBottom();
+                } else {
+                  print('⏭️ Ignoré: message de soi-même');
+                }
+              } catch (e) {
+                print('❌ Erreur conversion message: $e');
               }
             }
           }
@@ -113,25 +134,30 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     _messageController.clear();
 
     try {
-      print('📤 Envoi du message: "$messageContent" à ${widget.otherUser['firstName']}');
+      print('📤 Envoi du message: "$messageContent" à ${widget.otherUser.firstName}');
       
       final response = await ConversationService.sendMessage(
-        user2Id: widget.otherUser['_id'],
-        author: '${_currentUser!['firstName']} ${_currentUser!['lastName']}',
+        user2Id: widget.otherUser.id,
+        author: '${_currentUser!.firstName} ${_currentUser!.lastName}',
         content: messageContent,
-        authorImage: _currentUser!['profileImage'] ?? '',
+        authorImage: _currentUser!.profileImg ?? '',
       );
 
-      print('✅ Réponse serveur reçue: ${response.keys}');
+      print('✅ Réponse serveur reçue: id=${response.id}');
 
       // Ajouter le message au provider
-      final addedMessage = response;
-      final lastMessage = addedMessage['messages']?.last;
-
-      if (lastMessage != null && mounted) {
-        context.read<MessageProvider>().addMessage(
-          Message.fromJson(lastMessage),
-        );
+      if (response.messages.isNotEmpty && mounted) {
+        final lastModelMessage = response.messages.last;
+        final lastMessageMap = {
+          '_id': lastModelMessage.id,
+          'author_id': lastModelMessage.authorId,
+          'author': lastModelMessage.author,
+          'content': lastModelMessage.content,
+          'authorImage': lastModelMessage.authorImage,
+          'timestamp': lastModelMessage.timestamp,
+        };
+        final lastMessage = ProviderMessage.fromJson(lastMessageMap);
+        context.read<MessageProvider>().addMessage(lastMessage);
         print('📝 Message ajouté localement');
       }
 
@@ -139,10 +165,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 
       // Émettre via socket pour notifier l'autre personne
       if (mounted) {
-        print('🔔 Émission du socket pour notifier ${widget.otherUser['firstName']}');
+        print('🔔 Émission du socket pour notifier ${widget.otherUser.firstName}');
         context.read<ChatProvider>().sendSocketMessage(
-          addedMessage: addedMessage,
-          conversation: addedMessage,
+          addedMessage: response.toJson(),
+          conversation: response.toJson(),
         );
       }
     } catch (e) {
@@ -183,7 +209,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               backgroundColor: Colors.blue.shade300,
               radius: 18,
               child: Text(
-                widget.otherUser['firstName'][0].toUpperCase(),
+                widget.otherUser.firstName[0].toUpperCase(),
                 style: const TextStyle(color: Colors.white),
               ),
             ),
@@ -193,7 +219,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${widget.otherUser['firstName']} ${widget.otherUser['lastName']}',
+                    '${widget.otherUser.firstName} ${widget.otherUser.lastName}',
                     style: const TextStyle(fontSize: 16),
                   ),
                   // Afficher le statut en ligne
@@ -286,7 +312,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                   itemCount: messageProvider.messages.length,
                   itemBuilder: (context, index) {
                     final message = messageProvider.messages[index];
-                    final isMe = message.authorId == _currentUser?['_id'];
+                    final isMe = message.authorId == _currentUser?.id;
 
                     return Align(
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

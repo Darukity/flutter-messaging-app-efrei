@@ -5,6 +5,7 @@ import 'package:messaging_app_frontend/pages/chat/chat_detail_page.dart';
 import 'package:messaging_app_frontend/pages/auth/splash_page.dart';
 import 'package:messaging_app_frontend/pages/profile/profile_page.dart';
 import 'package:messaging_app_frontend/pages/profile/profile_edit_page.dart';
+import 'package:messaging_app_frontend/models/models.dart';
 
 // pages
 import 'pages/auth/login_page.dart';
@@ -22,13 +23,13 @@ class AppRoutes {
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     if (settings.name == '/chat-detail') {
-      final user = settings.arguments as Map<String, dynamic>;
+      final user = settings.arguments as User;
       return MaterialPageRoute(
         builder: (context) => ChatDetailPage(otherUser: user),
       );
     }
     if (settings.name == '/profile-edit') {
-      final user = settings.arguments as Map<String, dynamic>;
+      final user = settings.arguments as User;
       return MaterialPageRoute(
         builder: (context) => ProfileEditPage(user: user),
       );

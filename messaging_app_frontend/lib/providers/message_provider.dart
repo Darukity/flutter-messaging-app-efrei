@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class Message {
+class ProviderMessage {
   final String id;
   final String authorId;
   final String author;
@@ -8,7 +8,7 @@ class Message {
   final String authorImage;
   final DateTime timestamp;
 
-  Message({
+  ProviderMessage({
     required this.id,
     required this.authorId,
     required this.author,
@@ -17,8 +17,8 @@ class Message {
     required this.timestamp,
   });
 
-  factory Message.fromJson(Map<String, dynamic> json) {
-    return Message(
+  factory ProviderMessage.fromJson(Map<String, dynamic> json) {
+    return ProviderMessage(
       id: json['_id'] ?? '',
       authorId: json['author_id'] ?? '',
       author: json['author'] ?? '',
@@ -41,32 +41,31 @@ class Message {
 }
 
 class MessageProvider extends ChangeNotifier {
-  List<Message> _messages = [];
+  List<ProviderMessage> _messages = [];
   bool _isLoading = false;
   String? _error;
 
-  List<Message> get messages => _messages;
+  List<ProviderMessage> get messages => _messages;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
   // Charger les messages depuis le backend
   void setMessages(List<dynamic> messagesList) {
     _messages = messagesList
-        .map((msg) => Message.fromJson(msg as Map<String, dynamic>))
+        .map((msg) => ProviderMessage.fromJson(msg as Map<String, dynamic>))
         .toList();
     _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     notifyListeners();
   }
 
   // Ajouter un message (envoyé localement)
-  void addMessage(Message message) {
+  void addMessage(ProviderMessage message) {
     _messages.add(message);
     notifyListeners();
   }
 
   // Ajouter un message reçu en temps réel
-  void addReceivedMessage(Map<String, dynamic> messageData) {
-    final message = Message.fromJson(messageData);
+  void addReceivedMessage(ProviderMessage message) {
     _messages.add(message);
     notifyListeners();
   }

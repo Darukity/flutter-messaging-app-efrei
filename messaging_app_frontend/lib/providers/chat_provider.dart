@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../config/api_config.dart';
+import '../models/models.dart';
 
 class ChatProvider extends ChangeNotifier {
   static final ChatProvider _instance = ChatProvider._internal();
   late IO.Socket _socket;
-  Map<String, dynamic>? _currentUser;
-  Map<String, dynamic>? _otherUser;
+  User? _currentUser;
+  User? _otherUser;
   bool _isConnected = false;
   bool _isOnline = false;
   bool _socketInitialized = false;
-  List<dynamic> _onlineUsers = []; // 📋 Stocker la liste des utilisateurs en ligne
+  List<OnlineUser> _onlineUsers = []; // ✅ Models typés
 
   factory ChatProvider() {
     return _instance;
@@ -19,11 +20,11 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider._internal();
 
   IO.Socket get socket => _socket;
-  Map<String, dynamic>? get currentUser => _currentUser;
-  Map<String, dynamic>? get otherUser => _otherUser;
+  User? get currentUser => _currentUser;
+  User? get otherUser => _otherUser;
   bool get isConnected => _isConnected;
   bool get isOnline => _isOnline;
-  List<dynamic> get onlineUsers => _onlineUsers;
+  List<OnlineUser> get onlineUsers => _onlineUsers;
 
   // Initialiser le socket une seule fois
   void initSocket() {
@@ -59,8 +60,8 @@ class ChatProvider extends ChangeNotifier {
       
       // Réémettre addUser si on a déjà un utilisateur
       if (_currentUser != null) {
-        print('   📤 Rééémission addUser pour ${_currentUser!['_id']}');
-        _socket.emit('addUser', _currentUser!['_id']);
+        print('   📤 Rééémission addUser pour ${_currentUser!.id}');
+        _socket.emit('addUser', _currentUser!.id);
       }
     });
 
@@ -78,21 +79,19 @@ class ChatProvider extends ChangeNotifier {
 
     _socket.on('getUsers', (users) {
       print('👥 Utilisateurs en ligne reçus: $users');
-      _onlineUsers = users is List ? users : [];
+      
+      // ✅ Convertir en models OnlineUser
+      _onlineUsers = (users as List)
+          .map((item) => OnlineUser.fromJson(item as Map<String, dynamic>))
+          .toList();
       
       // Vérifier si l'autre utilisateur est en ligne
       if (_otherUser != null) {
         final wasOnline = _isOnline;
-        _isOnline = _onlineUsers.any((user) {
-          if (user is! Map) return false;
-          final userId = user['userId'];
-          final otherUserId = _otherUser!['_id'];
-          print('   🔍 Vérification: socket userId=$userId vs otherUserId=$otherUserId');
-          return userId == otherUserId;
-        });
+        _isOnline = _onlineUsers.any((u) => u.userId == _otherUser!.id);
         
         if (wasOnline != _isOnline) {
-          print('${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${_otherUser!['firstName']}');
+          print('${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${_otherUser!.fullName}');
           notifyListeners();
         } else {
           print('   → Statut inchangé (${_isOnline ? 'EN LIGNE' : 'HORS LIGNE'})');
@@ -111,43 +110,40 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  // Connecter l'utilisateur au socket
-  void connectUser(Map<String, dynamic> user) {
+  // 🔗 Connecter l'utilisateur au socket
+  void connectUser(User user) {
     _currentUser = user;
     if (!_socketInitialized) {
       initSocket();
     }
     
-    print('🔗 Connexion utilisateur: ${user['_id']}');
+    print('🔗 Connexion utilisateur: ${user.id}');
     
     // 🔍 Vérifier si le socket est déjà connecté
     if (_socket.connected) {
       print('   ✅ Socket déjà connecté, émission addUser immédiate');
-      _socket.emit('addUser', user['_id']);
+      _socket.emit('addUser', user.id);
     } else {
       print('   ⏳ Socket pas encore connecté, attente de la connexion...');
       // Attendre que le socket se connecte, puis émettre addUser
       _socket.onConnect((_) {
         print('   ✅ Socket connecté maintenant, émission addUser');
-        _socket.emit('addUser', user['_id']);
+        _socket.emit('addUser', user.id);
       });
     }
   }
 
-  // Définir l'autre utilisateur de la conversation
-  void setOtherUser(Map<String, dynamic> user) {
+  // 👤 Définir l'autre utilisateur de la conversation
+  void setOtherUser(User user) {
     _otherUser = user;
     
     // 🔍 Vérifier immédiatement le statut en ligne contre la liste stockée
     if (_onlineUsers.isNotEmpty) {
       final wasOnline = _isOnline;
-      _isOnline = _onlineUsers.any((u) {
-        if (u is! Map) return false;
-        return u['userId'] == user['_id'];
-      });
+      _isOnline = _onlineUsers.any((u) => u.userId == user.id);
       
       if (wasOnline != _isOnline) {
-        print('🔄 Statut immédiat: ${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${user['firstName']}');
+        print('🔄 Statut immédiat: ${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${user.fullName}');
       }
     } else {
       print('⚠️ Liste utilisateurs vide, en attente de getUsers');
@@ -184,7 +180,7 @@ class ChatProvider extends ChangeNotifier {
     Map<String, dynamic> addedMessage,
     Map<String, dynamic> conversation,
   ) {
-    print('📤 Envoi du message via socket à: ${_otherUser!['_id']}');
+    print('📤 Envoi du message via socket à: ${_otherUser!.id}');
     _socket.emit('sendMessage', {
       'addedMessage': addedMessage,
       'receiver': _otherUser,

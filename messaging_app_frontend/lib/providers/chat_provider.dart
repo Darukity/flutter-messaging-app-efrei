@@ -10,6 +10,7 @@ class ChatProvider extends ChangeNotifier {
   bool _isConnected = false;
   bool _isOnline = false;
   bool _socketInitialized = false;
+  List<dynamic> _onlineUsers = []; // 📋 Stocker la liste des utilisateurs en ligne
 
   factory ChatProvider() {
     return _instance;
@@ -22,6 +23,7 @@ class ChatProvider extends ChangeNotifier {
   Map<String, dynamic>? get otherUser => _otherUser;
   bool get isConnected => _isConnected;
   bool get isOnline => _isOnline;
+  List<dynamic> get onlineUsers => _onlineUsers;
 
   // Initialiser le socket une seule fois
   void initSocket() {
@@ -71,18 +73,28 @@ class ChatProvider extends ChangeNotifier {
     });
 
     _socket.on('getUsers', (users) {
-      print('👥 Utilisateurs en ligne: $users');
+      print('👥 Utilisateurs en ligne reçus: $users');
+      _onlineUsers = users is List ? users : [];
+      
       // Vérifier si l'autre utilisateur est en ligne
-      if (_otherUser != null && users is List) {
+      if (_otherUser != null) {
         final wasOnline = _isOnline;
-        _isOnline = users.any((user) {
-          return user is Map && user['userId'] == _otherUser!['_id'];
+        _isOnline = _onlineUsers.any((user) {
+          if (user is! Map) return false;
+          final userId = user['userId'];
+          final otherUserId = _otherUser!['_id'];
+          print('   🔍 Vérification: socket userId=$userId vs otherUserId=$otherUserId');
+          return userId == otherUserId;
         });
         
         if (wasOnline != _isOnline) {
-          print('${_isOnline ? '✅' : '⏱️'} ${_otherUser!['firstName']} est ${_isOnline ? 'EN LIGNE' : 'HORS LIGNE'}');
+          print('${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${_otherUser!['firstName']}');
           notifyListeners();
+        } else {
+          print('   → Statut inchangé (${_isOnline ? 'EN LIGNE' : 'HORS LIGNE'})');
         }
+      } else {
+        print('   → Pas d\'autre utilisateur défini');
       }
     });
 
@@ -109,10 +121,23 @@ class ChatProvider extends ChangeNotifier {
   // Définir l'autre utilisateur de la conversation
   void setOtherUser(Map<String, dynamic> user) {
     _otherUser = user;
-    // Vérifier le statut en ligne immédiatement
-    if (_isConnected) {
-      _socket.emit('getUsers'); // Demander la liste des utilisateurs en ligne
+    
+    // 🔍 Vérifier immédiatement le statut en ligne contre la liste stockée
+    if (_onlineUsers.isNotEmpty) {
+      final wasOnline = _isOnline;
+      _isOnline = _onlineUsers.any((u) {
+        if (u is! Map) return false;
+        return u['userId'] == user['_id'];
+      });
+      
+      if (wasOnline != _isOnline) {
+        print('🔄 Statut immédiat: ${_isOnline ? '✅ EN LIGNE' : '⏱️ HORS LIGNE'} ${user['firstName']}');
+      }
+    } else {
+      print('⚠️ Liste utilisateurs vide, en attente de getUsers');
+      _isOnline = false;
     }
+    
     notifyListeners();
   }
 
@@ -121,11 +146,28 @@ class ChatProvider extends ChangeNotifier {
     required Map<String, dynamic> addedMessage,
     required Map<String, dynamic> conversation,
   }) {
-    if (!_isConnected) {
-      print('⚠️ Socket non connecté, impossible d\'envoyer le message');
+    // 🔍 Vérifier si le socket est vraiment connecté
+    if (!_socket.connected) {
+      print('⚠️ Socket non connecté (_socket.connected = ${_socket.connected}), tentative de reconnexion...');
+      // Attendre un peu et réessayer
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_socket.connected) {
+          _sendMessageNow(addedMessage, conversation);
+        } else {
+          print('❌ Socket toujours non connecté après délai');
+        }
+      });
       return;
     }
 
+    _sendMessageNow(addedMessage, conversation);
+  }
+
+  // Envoyer le message maintenant (socket connecté)
+  void _sendMessageNow(
+    Map<String, dynamic> addedMessage,
+    Map<String, dynamic> conversation,
+  ) {
     print('📤 Envoi du message via socket à: ${_otherUser!['_id']}');
     _socket.emit('sendMessage', {
       'addedMessage': addedMessage,
@@ -134,8 +176,12 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  // Écouter les messages reçus
+  // Écouter les messages reçus (une seule fois)
   void onMessageReceived(Function(Map<String, dynamic>) callback) {
+    // Supprimer les anciens listeners pour éviter les doublons
+    _socket.off('getMessage');
+    
+    // Ajouter le nouveau listener
     _socket.on('getMessage', (data) {
       print('📩 Callback message reçu: $data');
       callback(data);

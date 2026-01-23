@@ -33,10 +33,14 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       _currentUser = userData;
     });
 
-    // Initialiser le ChatProvider
+    // Initialiser le ChatProvider (singleton, une seule fois)
     final chatProvider = context.read<ChatProvider>();
-    if (!chatProvider.isConnected && userData != null) {
-      chatProvider.initSocket(ApiConfig.baseUrl);
+    if (userData != null) {
+      // Initialiser le socket si pas déjà fait
+      if (!chatProvider.isConnected) {
+        chatProvider.initSocket();
+      }
+      // Connecter l'utilisateur
       chatProvider.connectUser(userData);
       chatProvider.setOtherUser(widget.otherUser);
     }
@@ -52,6 +56,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         }
         messageProvider.stopLoading();
       } catch (e) {
+        print('Erreur chargement messages: $e');
         messageProvider.setError(e.toString());
       }
     }
@@ -60,14 +65,23 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     if (mounted) {
       chatProvider.onMessageReceived((data) {
         if (mounted) {
-          final message = data['addedMessage'];
-          if (message != null && message['messages'] != null) {
-            final lastMessage = message['messages'].last;
+          print('📨 Données reçues du socket: $data');
+          final addedMessage = data['addedMessage'];
+          
+          if (addedMessage != null) {
+            final messages = addedMessage['messages'];
+            if (messages != null && messages is List && messages.isNotEmpty) {
+              final lastMessage = messages.last;
+              print('📌 Dernier message: author_id=${lastMessage['author_id']}, otherUserId=${widget.otherUser['_id']}');
 
-            // Ajouter uniquement si c'est de l'autre utilisateur
-            if (lastMessage['author_id'] == widget.otherUser['_id']) {
-              context.read<MessageProvider>().addReceivedMessage(lastMessage);
-              _scrollToBottom();
+              // Ajouter uniquement si c'est de l'autre utilisateur
+              if (lastMessage['author_id'] == widget.otherUser['_id']) {
+                print('✅ Ajout du message reçu de ${widget.otherUser['firstName']}');
+                context.read<MessageProvider>().addReceivedMessage(lastMessage);
+                _scrollToBottom();
+              } else {
+                print('⏭️ Ignoré: message de soi-même');
+              }
             }
           }
         }
@@ -96,6 +110,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     _messageController.clear();
 
     try {
+      print('📤 Envoi du message: "$messageContent" à ${widget.otherUser['firstName']}');
+      
       final response = await ConversationService.sendMessage(
         user2Id: widget.otherUser['_id'],
         author: '${_currentUser!['firstName']} ${_currentUser!['lastName']}',
@@ -103,26 +119,31 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         authorImage: _currentUser!['profileImage'] ?? '',
       );
 
+      print('✅ Réponse serveur reçue: ${response.keys}');
+
       // Ajouter le message au provider
       final addedMessage = response;
-      final lastMessage = addedMessage['messages'].last;
+      final lastMessage = addedMessage['messages']?.last;
 
-      if (mounted) {
+      if (lastMessage != null && mounted) {
         context.read<MessageProvider>().addMessage(
           Message.fromJson(lastMessage),
         );
+        print('📝 Message ajouté localement');
       }
 
       _scrollToBottom();
 
-      // Émettre via socket
+      // Émettre via socket pour notifier l'autre personne
       if (mounted) {
+        print('🔔 Émission du socket pour notifier ${widget.otherUser['firstName']}');
         context.read<ChatProvider>().sendSocketMessage(
           addedMessage: addedMessage,
           conversation: addedMessage,
         );
       }
     } catch (e) {
+      print('❌ Erreur envoi message: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur lors de l\'envoi: $e')),

@@ -16,6 +16,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => MessageProvider()),
+        // ChatProvider est un Singleton, créer une instance unique
         ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: MaterialApp(

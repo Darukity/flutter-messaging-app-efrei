@@ -28,10 +28,11 @@ class ChatProvider extends ChangeNotifier {
   // Initialiser le socket une seule fois
   void initSocket() {
     if (_socketInitialized) {
-      print('Socket déjà initialisé');
+      print('⚠️ Socket déjà initialisé, état connecté: ${_socket.connected}');
       return;
     }
 
+    print('🚀 Initialisation du socket...');
     _socket = IO.io(ApiConfig.socketUrl, <String, dynamic>{
       'transports': ['websocket', 'polling'],
       'autoConnect': true,
@@ -46,6 +47,7 @@ class ChatProvider extends ChangeNotifier {
     });
 
     _socketInitialized = true;
+    print('   Socket objet créé, autoConnect: true');
     _setupSocketListeners();
   }
 
@@ -57,6 +59,7 @@ class ChatProvider extends ChangeNotifier {
       
       // Réémettre addUser si on a déjà un utilisateur
       if (_currentUser != null) {
+        print('   📤 Rééémission addUser pour ${_currentUser!['_id']}');
         _socket.emit('addUser', _currentUser!['_id']);
       }
     });
@@ -70,6 +73,7 @@ class ChatProvider extends ChangeNotifier {
 
     _socket.on('connect_error', (error) {
       print('⚠️ Erreur connexion socket: $error');
+      _isConnected = false;
     });
 
     _socket.on('getUsers', (users) {
@@ -115,7 +119,19 @@ class ChatProvider extends ChangeNotifier {
     }
     
     print('🔗 Connexion utilisateur: ${user['_id']}');
-    _socket.emit('addUser', user['_id']);
+    
+    // 🔍 Vérifier si le socket est déjà connecté
+    if (_socket.connected) {
+      print('   ✅ Socket déjà connecté, émission addUser immédiate');
+      _socket.emit('addUser', user['_id']);
+    } else {
+      print('   ⏳ Socket pas encore connecté, attente de la connexion...');
+      // Attendre que le socket se connecte, puis émettre addUser
+      _socket.onConnect((_) {
+        print('   ✅ Socket connecté maintenant, émission addUser');
+        _socket.emit('addUser', user['_id']);
+      });
+    }
   }
 
   // Définir l'autre utilisateur de la conversation

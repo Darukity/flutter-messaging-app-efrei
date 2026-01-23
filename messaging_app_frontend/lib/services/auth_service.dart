@@ -1,82 +1,105 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../models/models.dart';
 import './auth_storage.dart';
 
-
+/// Service d'authentification avec gestion des modèles typés
 class AuthService {
   
-  static Future<Map<String, dynamic>> register({
+  /// 📝 Créer un compte utilisateur
+  /// 
+  /// Prend les données d'inscription et retourne une réponse typée AuthResponse
+  /// contenant le token et les données utilisateur en cas de succès
+  static Future<ApiResponse<AuthResponse>> register({
     required String firstName,
     required String lastName,
     required String email,
     required String password,
   }) async {
     try {
+      final request = SignupRequest(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        password: password,
+      );
+
       final response = await http.post(
         Uri.parse(ApiConfig.baseUrl + ApiConfig.register),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "firstName": firstName,
-          "lastName": lastName,
-          "email": email,
-          "password": password,
-        }),
+        body: jsonEncode(request.toJson()),
       );
 
-      final data = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return {
-          "success": true,
-          "data": data,
-        };
+        final authResponse = AuthResponse.fromJson(responseData);
+        await AuthStorage.saveToken(authResponse.token);
+        return ApiResponse<AuthResponse>(
+          success: true,
+          data: authResponse,
+        );
       } else {
-        return {
-          "success": false,
-          "error": data["error"] ?? "Erreur lors de l'inscription",
-        };
+        return ApiResponse<AuthResponse>(
+          success: false,
+          error: responseData["error"] ?? "Erreur lors de l'inscription",
+        );
       }
     } catch (e) {
-      return {
-        "success": false,
-        "error": "Impossible de contacter le serveur",
-      };
+      return ApiResponse<AuthResponse>(
+        success: false,
+        error: "Impossible de contacter le serveur: $e",
+      );
     }
   }
 
-  // ===== LOGIN (NOUVEAU) =====
-  static Future<Map<String, dynamic>> login({
+  /// 🔐 Se connecter avec email et mot de passe
+  /// 
+  /// Vérifie les identifiants et retourne un token JWT en cas de succès
+  static Future<ApiResponse<AuthResponse>> login({
     required String email,
     required String password,
   }) async {
     try {
+      final request = LoginRequest(
+        email: email,
+        password: password,
+      );
+
       final response = await http.post(
         Uri.parse(ApiConfig.baseUrl + ApiConfig.login),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": email,
-          "password": password,
-        }),
+        body: jsonEncode(request.toJson()),
       );
 
-      final data = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        final token = data["token"];
-          await AuthStorage.saveToken(token);
-          return {"success": true, "data": data};
+        final authResponse = AuthResponse.fromJson(responseData);
+        await AuthStorage.saveToken(authResponse.token);
+        return ApiResponse<AuthResponse>(
+          success: true,
+          data: authResponse,
+        );
       } else {
-        return {
-          "success": false,
-          "error": data["error"] ?? "Email ou mot de passe incorrect",
-        };
+        return ApiResponse<AuthResponse>(
+          success: false,
+          error: responseData["error"] ?? "Email ou mot de passe incorrect",
+        );
       }
     } catch (e) {
-      return {
-        "success": false,
-        "error": "Impossible de contacter le serveur",
-      };
+      return ApiResponse<AuthResponse>(
+        success: false,
+        error: "Impossible de contacter le serveur: $e",
+      );
     }
+  }
+
+  /// 🚪 Déconnecter l'utilisateur
+  /// 
+  /// Supprime le token stocké localement
+  static Future<void> logout() async {
+    await AuthStorage.clearToken();
   }
 }

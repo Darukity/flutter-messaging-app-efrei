@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
+import '../../models/models.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -31,16 +32,16 @@ class _RegisterPageState extends State<RegisterPage> {
       password: passwordCtrl.text,
     );
 
-    if (result["success"]) {
+    if (result.success && result.data != null) {
       // Save token and user data, then redirect to users page
-      final data = result["data"];
-      await AuthStorage.saveToken(data["token"]);
-      await AuthStorage.saveUserData(data);
+      final authResponse = result.data!;
+      await AuthStorage.saveToken(authResponse.token);
+      await AuthStorage.saveUserData(authResponse.user);
       
       Navigator.pushReplacementNamed(context, '/users');
     } else {
       setState(() {
-        error = result["error"];
+        error = result.error ?? 'Erreur d\'inscription';
       });
     }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:messaging_app_frontend/services/auth_storage.dart';
-import 'package:messaging_app_frontend/services/user_profile_service.dart';
+import 'package:messaging_app_frontend/models/models.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -10,7 +10,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  Map<String, dynamic>? _currentUser;
+  User? _currentUser;
   bool _isLoading = true;
   int _selectedIndex = 2;
 
@@ -36,16 +36,26 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       // Charger les données locales d'abord (rapide)
       final userData = await AuthStorage.getUserData();
-      setState(() {
-        _currentUser = userData;
-        _isLoading = false;
-      });
+      debugPrint('👤 [ProfilePage] Chargement profil...');
+      debugPrint('   Données: $userData');
+      
+      if (userData != null) {
+        setState(() {
+          _currentUser = User.fromJson(userData);
+          _isLoading = false;
+        });
+        debugPrint('   ✅ Profil chargé: ${_currentUser!.firstName} ${_currentUser!.lastName}');
+      } else {
+        debugPrint('   ❌ Aucune donnée utilisateur trouvée en stockage');
+        setState(() {
+          _isLoading = false;
+        });
+      }
 
       // Puis faire un refresh depuis le backend pour avoir les dernières données
       // Note: Vous pouvez utiliser UserProfileService.getCurrentProfile() si vous avez un endpoint backend
-      print('✅ Profil chargé avec les données locales');
     } catch (e) {
-      print('❌ Erreur chargement profil: $e');
+      debugPrint('❌ Erreur chargement profil: $e');
       setState(() {
         _isLoading = false;
       });
@@ -136,7 +146,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                   radius: 58,
                                   backgroundColor: Colors.blue.shade300,
                                   child: Text(
-                                    '${_currentUser!['firstName'][0]}${_currentUser!['lastName'][0]}'.toUpperCase(),
+                                    '${_currentUser!.firstName.isNotEmpty ? _currentUser!.firstName[0] : '?'}${_currentUser!.lastName.isNotEmpty ? _currentUser!.lastName[0] : '?'}'
+                                        .toUpperCase(),
                                     style: const TextStyle(
                                       fontSize: 32,
                                       fontWeight: FontWeight.bold,
@@ -158,7 +169,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           children: [
                             // Nom
                             Text(
-                              '${_currentUser!['firstName']} ${_currentUser!['lastName']}',
+                              '${_currentUser!.firstName} ${_currentUser!.lastName}',
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -169,7 +180,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                             // Email
                             Text(
-                              _currentUser!['email'] ?? 'Non défini',
+                              _currentUser!.email,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade600,
@@ -178,10 +189,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             const SizedBox(height: 8),
 
                             // Profession
-                            if (_currentUser!['profession'] != null &&
-                                (_currentUser!['profession'] as String).isNotEmpty)
+                            if (_currentUser!.profession != null &&
+                                _currentUser!.profession!.isNotEmpty)
                               Text(
-                                _currentUser!['profession'],
+                                _currentUser!.profession!,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.blue.shade600,
@@ -252,23 +263,19 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                                 _buildKPICard(
                                   'Lieu',
-                                  _currentUser!['location']?.isNotEmpty == true
-                                      ? _currentUser!['location']
-                                      : 'Non défini',
+                                  _currentUser!.location ?? 'Non défini',
                                   Icons.location_on,
                                   Colors.green,
                                 ),
                                 _buildKPICard(
                                   'Employeur',
-                                  _currentUser!['employer']?.isNotEmpty == true
-                                      ? _currentUser!['employer']
-                                      : 'Non défini',
+                                  _currentUser!.employer ?? 'Non défini',
                                   Icons.business,
                                   Colors.orange,
                                 ),
                                 _buildKPICard(
                                   'Compétences',
-                                  '${_currentUser!['skills']?.length ?? 0}',
+                                  '${_currentUser!.skills?.length ?? 0}',
                                   Icons.star,
                                   Colors.purple,
                                 ),
@@ -281,8 +288,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       const SizedBox(height: 32),
 
                       // À propos
-                      if (_currentUser!['aboutUser'] != null &&
-                          (_currentUser!['aboutUser'] as String).isNotEmpty)
+                      if (_currentUser!.aboutUser != null &&
+                          _currentUser!.aboutUser!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
@@ -304,7 +311,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  _currentUser!['aboutUser'],
+                                  _currentUser!.aboutUser ?? '',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     height: 1.6,
@@ -317,8 +324,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
 
                       // Compétences
-                      if (_currentUser!['skills'] != null &&
-                          (_currentUser!['skills'] as List).isNotEmpty)
+                      if (_currentUser!.skills != null &&
+                          _currentUser!.skills!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
@@ -336,14 +343,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: [
-                                  for (var skill in _currentUser!['skills'] as List)
-                                    Chip(
-                                      label: Text(skill.toString()),
-                                      backgroundColor: Colors.blue.shade50,
-                                      labelStyle: TextStyle(
-                                        color: Colors.blue.shade700,
+                                  if (_currentUser!.skills != null)
+                                    for (var skill in _currentUser!.skills!)
+                                      Chip(
+                                        label: Text(skill),
+                                        backgroundColor: Colors.blue.shade50,
+                                        labelStyle: TextStyle(
+                                          color: Colors.blue.shade700,
+                                        ),
                                       ),
-                                    ),
                                 ],
                               ),
                               const SizedBox(height: 32),
@@ -453,31 +461,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   String _getJoinedDaysAgo() {
-    if (_currentUser!['createdAt'] == null) return 'Non défini';
-
-    try {
-      final createdAt = DateTime.parse(_currentUser!['createdAt']);
-      final now = DateTime.now();
-      final difference = now.difference(createdAt).inDays;
-
-      if (difference == 0) {
-        return 'Aujourd\'hui';
-      } else if (difference == 1) {
-        return 'Hier';
-      } else if (difference < 7) {
-        return 'Il y a $difference j';
-      } else if (difference < 30) {
-        final weeks = (difference / 7).floor();
-        return 'Il y a $weeks sem';
-      } else if (difference < 365) {
-        final months = (difference / 30).floor();
-        return 'Il y a $months mois';
-      } else {
-        final years = (difference / 365).floor();
-        return 'Il y a $years an${years > 1 ? 's' : ''}';
-      }
-    } catch (e) {
-      return 'Non défini';
-    }
+    // Note: createdAt n'est pas dans le modèle User, donc retourner une valeur par défaut
+    return 'Non défini';
   }
 }

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:messaging_app_frontend/services/user_profile_service.dart';
 import 'package:messaging_app_frontend/services/auth_storage.dart';
+import 'package:messaging_app_frontend/models/models.dart';
 
 class ProfileEditPage extends StatefulWidget {
-  final Map<String, dynamic> user;
+  final User user;
 
   const ProfileEditPage({
     Key? key,
@@ -34,18 +35,18 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 
   void _initializeControllers() {
-    _firstNameController = TextEditingController(text: widget.user['firstName'] ?? '');
-    _lastNameController = TextEditingController(text: widget.user['lastName'] ?? '');
-    _emailController = TextEditingController(text: widget.user['email'] ?? '');
-    _professionController = TextEditingController(text: widget.user['profession'] ?? '');
-    _employerController = TextEditingController(text: widget.user['employer'] ?? '');
-    _locationController = TextEditingController(text: widget.user['location'] ?? '');
-    _aboutController = TextEditingController(text: widget.user['aboutUser'] ?? '');
+    _firstNameController = TextEditingController(text: widget.user.firstName);
+    _lastNameController = TextEditingController(text: widget.user.lastName);
+    _emailController = TextEditingController(text: widget.user.email);
+    _professionController = TextEditingController(text: widget.user.profession ?? '');
+    _employerController = TextEditingController(text: widget.user.employer ?? '');
+    _locationController = TextEditingController(text: widget.user.location ?? '');
+    _aboutController = TextEditingController(text: widget.user.aboutUser ?? '');
     _skillsController = TextEditingController();
 
     // Initialiser les compétences
-    if (widget.user['skills'] != null && widget.user['skills'] is List) {
-      _skills = List<String>.from(widget.user['skills'] as List);
+    if (widget.user.skills != null && widget.user.skills!.isNotEmpty) {
+      _skills = List<String>.from(widget.user.skills!);
     }
   }
 
@@ -95,7 +96,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     });
 
     try {
-      final updatedData = await UserProfileService.updateProfileData(
+      final updateResponse = await UserProfileService.updateProfileData(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
@@ -105,17 +106,22 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         skills: _skills,
       );
 
+      if (!updateResponse.success) {
+        throw Exception(updateResponse.error ?? 'Erreur lors de la mise à jour');
+      }
+
+      var updatedUser = updateResponse.data!;
+
       // Mettre à jour la bio si fournie
       if (_aboutController.text.isNotEmpty) {
-        await UserProfileService.updateAbout(_aboutController.text.trim());
+        final aboutResponse = await UserProfileService.updateAbout(_aboutController.text.trim());
+        if (aboutResponse.success && aboutResponse.data != null) {
+          updatedUser = aboutResponse.data!;
+        }
       }
 
       // 🔄 IMPORTANT: Mettre à jour les données locales du user dans AuthStorage
-      final updatedUser = {
-        ...updatedData,
-        'aboutUser': _aboutController.text.trim(),
-      };
-      await AuthStorage.saveUserData(updatedUser);
+      await AuthStorage.saveUserData(updatedUser.toJson());
       print('✅ AuthStorage mis à jour avec les nouvelles données');
 
       if (mounted) {

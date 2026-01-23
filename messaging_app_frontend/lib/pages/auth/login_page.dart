@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:messaging_app_frontend/services/auth_service.dart';
 import 'package:messaging_app_frontend/services/auth_storage.dart';
+import 'package:messaging_app_frontend/models/models.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -27,17 +28,27 @@ class _LoginPageState extends State<LoginPage> {
       password: passwordCtrl.text,
     );
 
-    if (result["success"]) {
+    if (result.success && result.data != null) {
       // Save token and user data
-      final data = result["data"];
-      await AuthStorage.saveToken(data["token"]);
-      await AuthStorage.saveUserData(data);
+      final authResponse = result.data!;
       
-      Navigator.pushReplacementNamed(context, '/users');
+      debugPrint('🔐 Login réussi !');
+      debugPrint('   Token: ${authResponse.token.substring(0, 20)}...');
+      debugPrint('   User data: ${authResponse.user}');
+      
+      await AuthStorage.saveToken(authResponse.token);
+      await AuthStorage.saveUserData(authResponse.user);
+      
+      debugPrint('✅ Token et données utilisateur sauvegardés');
+      
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/users');
+      }
     } else {
       setState(() {
-        error = result["error"];
+        error = result.error ?? 'Erreur de connexion';
       });
+      debugPrint('❌ Erreur login: $error');
     }
 
     setState(() {

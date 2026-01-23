@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:messaging_app_frontend/services/auth_storage.dart';
 import 'package:messaging_app_frontend/services/conversation_service.dart';
+import 'package:messaging_app_frontend/models/models.dart';
 
 class ConversationsPage extends StatefulWidget {
   const ConversationsPage({Key? key}) : super(key: key);
@@ -10,11 +11,11 @@ class ConversationsPage extends StatefulWidget {
 }
 
 class _ConversationsPageState extends State<ConversationsPage> {
-  List<dynamic> _conversations = [];
-  Map<String, dynamic>? _currentUser;
+  List<Conversation> _conversations = [];
+  User? _currentUser;
   bool _isLoading = true;
   int _selectedIndex = 1;
-  Map<String, Map<String, dynamic>> _userCache = {}; // Cache for user details
+  final Map<String, User> _userCache = {}; // Cache for user details
 
   @override
   void initState() {
@@ -30,8 +31,10 @@ class _ConversationsPageState extends State<ConversationsPage> {
 
   Future<void> _protectPage() async {
     final token = await AuthStorage.getToken();
+    debugPrint('🔐 Protection page - Token: ${token != null ? "présent" : "absent"}');
     if (token == null) {
       if (mounted) {
+        debugPrint('❌ Pas de token, redirection vers login');
         Navigator.pushReplacementNamed(context, '/login');
       }
     }
@@ -39,34 +42,46 @@ class _ConversationsPageState extends State<ConversationsPage> {
 
   Future<void> _loadCurrentUser() async {
     final userData = await AuthStorage.getUserData();
+    debugPrint('👤 Chargement utilisateur actuel...');
+    debugPrint('   Données: $userData');
+    
     if (userData != null) {
       setState(() {
-        _currentUser = userData;
+        _currentUser = User.fromJson(userData);
       });
+      debugPrint('   ✅ Utilisateur chargé: ${_currentUser!.firstName} ${_currentUser!.lastName}');
+    } else {
+      debugPrint('   ❌ Aucune donnée utilisateur trouvée en stockage');
     }
   }
 
   Future<void> _loadConversations() async {
     try {
+      debugPrint('🔍 Chargement des conversations...');
       final conversations = await ConversationService.getConversations();
+      debugPrint('   ✅ ${conversations.length} conversations récupérées');
+      
       // Filter conversations where current user is involved
       final myConversations = conversations.where((conv) {
-        return conv['user1_id'] == _currentUser?['_id'] || 
-               conv['user2_id'] == _currentUser?['_id'];
+        return conv.user1Id == _currentUser?.id || 
+               conv.user2Id == _currentUser?.id;
       }).toList();
+      
+      debugPrint('   → ${myConversations.length} conversations pour l\'utilisateur actuel');
       
       // 🔄 Rafraîchir les détails de l'utilisateur pour chaque conversation
       // Cela assure que les noms modifiés sont affichés correctement
       for (var conv in myConversations) {
-        final otherUserId = conv['user1_id'] == _currentUser?['_id']
-            ? conv['user2_id']
-            : conv['user1_id'];
+        final otherUserId = conv.user1Id == _currentUser?.id
+            ? conv.user2Id
+            : conv.user1Id;
         
         try {
           final userDetails = await ConversationService.getUserById(otherUserId);
           _userCache[otherUserId] = userDetails;
+          debugPrint('   ✅ Cache mis à jour pour: ${userDetails.fullName}');
         } catch (e) {
-          print('❌ Erreur lors du chargement des détails pour $otherUserId: $e');
+          debugPrint('❌ Erreur lors du chargement des détails pour $otherUserId: $e');
           // Le cache reste avec les anciennes données en cas d'erreur
         }
       }
@@ -76,6 +91,7 @@ class _ConversationsPageState extends State<ConversationsPage> {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('❌ Erreur chargement conversations: $e');
       setState(() {
         _isLoading = false;
       });
@@ -94,65 +110,71 @@ class _ConversationsPageState extends State<ConversationsPage> {
     }
   }
 
-  Map<String, dynamic> _getOtherUserInfo(Map<String, dynamic> conversation) {
-    final otherUserId = conversation['user1_id'] == _currentUser?['_id']
-        ? conversation['user2_id']
-        : conversation['user1_id'];
+  User _getOtherUserInfo(Conversation conversation) {
+    final otherUserId = conversation.user1Id == _currentUser?.id
+        ? conversation.user2Id
+        : conversation.user1Id;
 
     // ✅ Priorité 1: Vérifier le cache (qui est rafraîchi à chaque chargement)
     if (_userCache.containsKey(otherUserId)) {
       final cachedUser = _userCache[otherUserId]!;
-      // S'assurer que nous avons les bonnes données
-      if (cachedUser['firstName'] != null && cachedUser['firstName'].isNotEmpty) {
+      if (cachedUser.firstName.isNotEmpty) {
         return cachedUser;
       }
     }
 
     // ✅ Priorité 2: Extraire du dernier message (fallback)
-    final messages = conversation['messages'] as List;
-    if (messages.isNotEmpty) {
+    if (conversation.messages.isNotEmpty) {
       try {
-        final otherUserMessage = messages.firstWhere(
-          (msg) => msg['author_id'] == otherUserId,
+        final otherUserMessage = conversation.messages.firstWhere(
+          (msg) => msg.authorId == otherUserId,
         );
 
-        return {
-          '_id': otherUserId,
-          'firstName': otherUserMessage['author']?.split(' ')[0] ?? 'Utilisateur',
-          'lastName': otherUserMessage['author']?.split(' ').skip(1).join(' ') ?? '',
-          'email': '',
-        };
+        return User(
+          id: otherUserId,
+          firstName: otherUserMessage.author.split(' ')[0],
+          lastName: otherUserMessage.author.split(' ').skip(1).join(' '),
+          email: '',
+          profession: null,
+          employer: null,
+          location: null,
+          aboutUser: null,
+          skills: null,
+          profileImg: null,
+          coverImg: null,
+        );
       } catch (e) {
         // Aucun message de cet utilisateur
       }
     }
 
     // ✅ Priorité 3: Données par défaut
-    return {
-      '_id': otherUserId,
-      'firstName': 'Utilisateur',
-      'lastName': '',
-      'email': '',
-    };
+    return User(
+      id: otherUserId,
+      firstName: 'Utilisateur',
+      lastName: '',
+      email: '',
+      profession: null,
+      employer: null,
+      location: null,
+      aboutUser: null,
+      skills: null,
+      profileImg: null,
+      coverImg: null,
+    );
   }
 
-  String _getLastMessage(Map<String, dynamic> conversation) {
-    final messages = conversation['messages'] as List;
-    if (messages.isEmpty) return 'Pas de messages';
-    
-    final lastMsg = messages.last;
-    return lastMsg['content'] ?? '';
+  String _getLastMessage(Conversation conversation) {
+    if (conversation.messages.isEmpty) return 'Pas de messages';
+    return conversation.messages.last.content;
   }
 
-  String _getLastMessageTime(Map<String, dynamic> conversation) {
-    final messages = conversation['messages'] as List;
-    if (messages.isEmpty) return '';
-    
-    final lastMsg = messages.last;
-    return _formatTime(lastMsg['createdAt']);
+  String _getLastMessageTime(Conversation conversation) {
+    if (conversation.messages.isEmpty) return '';
+    return _formatTime(conversation.messages.last.timestamp);
   }
 
-  void _openChat(Map<String, dynamic> otherUser) {
+  void _openChat(User otherUser) {
     Navigator.pushNamed(
       context,
       '/chat-detail',
@@ -188,7 +210,9 @@ class _ConversationsPageState extends State<ConversationsPage> {
                         CircleAvatar(
                           backgroundColor: Colors.blue,
                           child: Text(
-                            _currentUser!['firstName'][0].toUpperCase(),
+                            _currentUser!.firstName.isNotEmpty
+                                ? _currentUser!.firstName[0].toUpperCase()
+                                : '?',
                             style: const TextStyle(color: Colors.white),
                           ),
                         ),
@@ -198,14 +222,14 @@ class _ConversationsPageState extends State<ConversationsPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${_currentUser!['firstName']} ${_currentUser!['lastName']}',
+                                '${_currentUser!.firstName} ${_currentUser!.lastName}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
                               ),
                               Text(
-                                _currentUser!['email'],
+                                _currentUser!.email,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
@@ -264,12 +288,14 @@ class _ConversationsPageState extends State<ConversationsPage> {
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue.shade300,
                                   child: Text(
-                                    otherUser['firstName'][0].toUpperCase(),
+                                    otherUser.firstName.isNotEmpty
+                                        ? otherUser.firstName[0].toUpperCase()
+                                        : '?',
                                     style: const TextStyle(color: Colors.white),
                                   ),
                                 ),
                                 title: Text(
-                                  '${otherUser['firstName']} ${otherUser['lastName']}'.trim(),
+                                  '${otherUser.firstName} ${otherUser.lastName}'.trim(),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
                                   ),
